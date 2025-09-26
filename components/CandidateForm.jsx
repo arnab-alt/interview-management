@@ -12,8 +12,7 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
   const salesPersonRef = useRef();
   const companyRef = useRef();
   const statusRef = useRef();
-  const jobDescriptionRef = useRef();
-
+  
   const [errors, setErrors] = useState({});
   const [interviewHistory, setInterviewHistory] = useState(candidate?.interview_history || []);
 
