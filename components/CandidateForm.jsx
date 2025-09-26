@@ -1,29 +1,72 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Save, X, User, Mail, Phone, Calendar, Building, UserCheck, Plus, Trash2 } from 'lucide-react';
 
 export default function CandidateForm({ candidate = null, onSubmit, onCancel, loading = false }) {
-  // Use refs for uncontrolled inputs to prevent re-rendering
+  // Basic info refs
   const nameRef = useRef();
   const emailRef = useRef();
   const phoneRef = useRef();
-  const lastDateRef = useRef();
-  const upcomingDateRef = useRef();
   const recruiterRef = useRef();
   const salesPersonRef = useRef();
   const companyRef = useRef();
-  const interviewerRef = useRef();
   const statusRef = useRef();
+  const jobDescriptionRef = useRef();
 
   const [errors, setErrors] = useState({});
   const [interviewHistory, setInterviewHistory] = useState(candidate?.interview_history || []);
-  const [nextInterview, setNextInterview] = useState(candidate?.next_interview || {
-    interview_date: '',
-    interviewer_name: '',
-    interview_type: 'Phone',
-    notes: ''
+
+  // Auto-calculate fields from interview history
+  const [calculatedFields, setCalculatedFields] = useState({
+    interview_count: 0,
+    last_date_of_interview: null,
+    upcoming_interview_date: null,
+    primary_interviewer: '',
   });
+
+  useEffect(() => {
+    calculateFieldsFromHistory();
+  }, [interviewHistory]);
+
+  const calculateFieldsFromHistory = () => {
+    const completedInterviews = interviewHistory.filter(interview => 
+      interview.status === 'Completed' && interview.interview_date
+    );
+    
+    const scheduledInterviews = interviewHistory.filter(interview => 
+      interview.status === 'Scheduled' && 
+      interview.interview_date && 
+      new Date(interview.interview_date) > new Date()
+    );
+
+    // Calculate last interview date
+    const lastInterview = completedInterviews
+      .sort((a, b) => new Date(b.interview_date) - new Date(a.interview_date))[0];
+    
+    // Calculate next upcoming interview
+    const nextInterview = scheduledInterviews
+      .sort((a, b) => new Date(a.interview_date) - new Date(b.interview_date))[0];
+
+    // Get most frequent interviewer as primary
+    const interviewerCounts = {};
+    interviewHistory.forEach(interview => {
+      if (interview.interviewer_name) {
+        interviewerCounts[interview.interviewer_name] = 
+          (interviewerCounts[interview.interviewer_name] || 0) + 1;
+      }
+    });
+    
+    const primaryInterviewer = Object.entries(interviewerCounts)
+      .sort(([,a], [,b]) => b - a)[0]?.[0] || '';
+
+    setCalculatedFields({
+      interview_count: completedInterviews.length,
+      last_date_of_interview: lastInterview?.interview_date || null,
+      upcoming_interview_date: nextInterview?.interview_date || null,
+      primary_interviewer: primaryInterviewer,
+    });
+  };
 
   const clearError = (fieldName) => {
     if (errors[fieldName]) {
@@ -40,25 +83,28 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
       interview_date: '',
       interviewer_name: '',
       interview_type: 'Phone',
-      status: 'Completed',
+      status: 'Scheduled',
       feedback: '',
-      rating: 3
+      rating: null,
+      round_number: interviewHistory.length + 1
     };
     setInterviewHistory([...interviewHistory, newInterview]);
   };
 
   const removeInterviewFromHistory = (index) => {
-    setInterviewHistory(interviewHistory.filter((_, i) => i !== index));
+    const updated = interviewHistory.filter((_, i) => i !== index);
+    // Recalculate round numbers
+    const reIndexed = updated.map((interview, i) => ({
+      ...interview,
+      round_number: i + 1
+    }));
+    setInterviewHistory(reIndexed);
   };
 
   const updateInterviewHistory = (index, field, value) => {
     const updated = [...interviewHistory];
     updated[index] = { ...updated[index], [field]: value };
     setInterviewHistory(updated);
-  };
-
-  const updateNextInterview = (field, value) => {
-    setNextInterview(prev => ({ ...prev, [field]: value }));
   };
 
   const validateForm = () => {
@@ -70,7 +116,6 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
     const recruiter = recruiterRef.current?.value?.trim();
     const salesPerson = salesPersonRef.current?.value?.trim();
     const company = companyRef.current?.value?.trim();
-    const interviewer = interviewerRef.current?.value?.trim();
     
     if (!name) {
       newErrors.candidate_name = 'Candidate name is required';
@@ -99,10 +144,6 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
     if (!company) {
       newErrors.interviewed_company_name = 'Company name is required';
     }
-    
-    if (!interviewer) {
-      newErrors.interview_by = 'Interviewer name is required';
-    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -116,17 +157,27 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
         candidate_name: nameRef.current?.value?.trim() || '',
         candidate_email: emailRef.current?.value?.trim() || '',
         candidate_phone_no: phoneRef.current?.value?.trim() || '',
-        last_date_of_interview: lastDateRef.current?.value ? new Date(lastDateRef.current.value) : null,
-        upcoming_interview_date: upcomingDateRef.current?.value ? new Date(upcomingDateRef.current.value) : null,
         recruiter_name: recruiterRef.current?.value?.trim() || '',
         sales_person_name: salesPersonRef.current?.value?.trim() || '',
         interviewed_company_name: companyRef.current?.value?.trim() || '',
-        interview_by: interviewerRef.current?.value?.trim() || '',
         current_status: statusRef.current?.value || 'Applied',
-        interview_history: interviewHistory.filter(interview => 
-          interview.interview_date && interview.interviewer_name
-        ),
-        next_interview: nextInterview.interview_date && nextInterview.interviewer_name ? nextInterview : null,
+        
+        // Auto-calculated fields from interview history
+        interview_count: calculatedFields.interview_count,
+        last_date_of_interview: calculatedFields.last_date_of_interview 
+          ? new Date(calculatedFields.last_date_of_interview) 
+          : null,
+        upcoming_interview_date: calculatedFields.upcoming_interview_date 
+          ? new Date(calculatedFields.upcoming_interview_date) 
+          : null,
+        interview_by: calculatedFields.primary_interviewer,
+        
+        // Interview history with proper date conversion
+        interview_history: interviewHistory.map(interview => ({
+          ...interview,
+          interview_date: interview.interview_date ? new Date(interview.interview_date) : null,
+          rating: interview.rating ? parseInt(interview.rating) : null,
+        })).filter(interview => interview.interview_date && interview.interviewer_name),
       };
       
       onSubmit(formData);
@@ -140,7 +191,7 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
           {candidate ? 'Edit Candidate' : 'Add New Candidate'}
         </h2>
         <p className="text-gray-600 mt-1">
-          {candidate ? 'Update candidate information' : 'Enter candidate details for interview tracking'}
+          {candidate ? 'Update candidate information and interview history' : 'Enter candidate details and track interview progress'}
         </p>
       </div>
       
@@ -262,13 +313,13 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
           </div>
         </div>
 
-        {/* Interview Details Section */}
+        {/* Team & Company Details */}
         <div>
           <h3 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
             <Building className="h-5 w-5 mr-2 text-green-600" />
-            Interview Details
+            Team & Company Details
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Recruiter Name */}
             <div>
               <label htmlFor="recruiter_name" className="flex items-center text-sm font-medium text-gray-700 mb-2">
@@ -325,26 +376,28 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
               )}
             </div>
 
-            {/* Company Name */}
+            {/* Company Name - Dropdown */}
             <div>
               <label htmlFor="interviewed_company_name" className="flex items-center text-sm font-medium text-gray-700 mb-2">
                 <Building className="h-4 w-4 mr-2 text-gray-500" />
                 Company Name <span className="text-red-500 ml-1">*</span>
               </label>
-              <input
+              <select
                 ref={companyRef}
                 id="interviewed_company_name"
                 name="interviewed_company_name"
-                type="text"
                 defaultValue={candidate?.interviewed_company_name || ''}
                 onFocus={() => clearError('interviewed_company_name')}
                 className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
                   errors.interviewed_company_name ? 'border-red-500 bg-red-50' : 'border-gray-300'
                 }`}
-                placeholder="Enter company name"
                 disabled={loading}
-                autoComplete="organization"
-              />
+              >
+                <option value="">Select a company</option>
+                <option value="CodersData">CodersData</option>
+                <option value="DetaPent">DetaPent</option>
+                <option value="MatricsTek">MatricsTek</option>
+              </select>
               {errors.interviewed_company_name && (
                 <p className="mt-1 text-sm text-red-600 flex items-center">
                   <X className="h-4 w-4 mr-1" />
@@ -352,73 +405,71 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
                 </p>
               )}
             </div>
+          </div>
 
-            {/* Primary Interviewer */}
-            <div>
-              <label htmlFor="interview_by" className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                <UserCheck className="h-4 w-4 mr-2 text-gray-500" />
-                Primary Interviewer <span className="text-red-500 ml-1">*</span>
-              </label>
-              <input
-                ref={interviewerRef}
-                id="interview_by"
-                name="interview_by"
-                type="text"
-                defaultValue={candidate?.interview_by || ''}
-                onFocus={() => clearError('interview_by')}
-                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                  errors.interview_by ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                }`}
-                placeholder="Enter primary interviewer's name"
-                disabled={loading}
-                autoComplete="off"
-              />
-              {errors.interview_by && (
-                <p className="mt-1 text-sm text-red-600 flex items-center">
-                  <X className="h-4 w-4 mr-1" />
-                  {errors.interview_by}
-                </p>
-              )}
+          {/* Job Description - Full Width */}
+          <div className="mt-6">
+            <label htmlFor="job_description" className="flex items-center text-sm font-medium text-gray-700 mb-2">
+              <Building className="h-4 w-4 mr-2 text-gray-500" />
+              Job Description
+            </label>
+            <textarea
+              ref={jobDescriptionRef}
+              id="job_description"
+              name="job_description"
+              defaultValue={candidate?.job_description || ''}
+              rows={8}
+              maxLength={3000}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-vertical min-h-[200px]"
+              placeholder="Enter detailed job description, requirements, responsibilities, and other relevant details... (Max 3000 characters)"
+              disabled={loading}
+              onChange={(e) => setJobDescriptionLength(e.target.value.length)}
+            />
+            <div className="flex justify-between items-center mt-1">
+              <p className="text-xs text-gray-500">
+                Provide comprehensive job details including requirements, responsibilities, and qualifications
+              </p>
+              <p className="text-xs text-gray-500">
+                <span className={`${jobDescriptionLength > 2800 ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
+                  {jobDescriptionLength}
+                </span> / 3000 characters
+              </p>
             </div>
+          </div>
+        </div>
 
-            {/* Last Interview Date */}
-            <div>
-              <label htmlFor="last_date_of_interview" className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                <Calendar className="h-4 w-4 mr-2 text-gray-500" />
-                Last Interview Date
-              </label>
-              <input
-                ref={lastDateRef}
-                id="last_date_of_interview"
-                name="last_date_of_interview"
-                type="date"
-                defaultValue={candidate?.last_date_of_interview 
-                  ? new Date(candidate.last_date_of_interview).toISOString().split('T')[0] 
-                  : ''
-                }
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                disabled={loading}
-              />
+        {/* Auto-Calculated Summary */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+            <Calendar className="h-5 w-5 mr-2 text-indigo-600" />
+            Interview Summary (Auto-Calculated)
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+              <div className="text-2xl font-bold text-blue-600">{calculatedFields.interview_count}</div>
+              <div className="text-sm text-gray-600">Total Interviews</div>
             </div>
-
-            {/* Upcoming Interview Date */}
-            <div>
-              <label htmlFor="upcoming_interview_date" className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                <Calendar className="h-4 w-4 mr-2 text-gray-500" />
-                Upcoming Interview Date
-              </label>
-              <input
-                ref={upcomingDateRef}
-                id="upcoming_interview_date"
-                name="upcoming_interview_date"
-                type="date"
-                defaultValue={candidate?.upcoming_interview_date 
-                  ? new Date(candidate.upcoming_interview_date).toISOString().split('T')[0] 
-                  : ''
-                }
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                disabled={loading}
-              />
+            <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+              <div className="text-sm font-medium text-gray-900">
+                {calculatedFields.last_date_of_interview 
+                  ? new Date(calculatedFields.last_date_of_interview).toLocaleDateString()
+                  : 'None'}
+              </div>
+              <div className="text-sm text-gray-600">Last Interview</div>
+            </div>
+            <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+              <div className="text-sm font-medium text-gray-900">
+                {calculatedFields.upcoming_interview_date 
+                  ? new Date(calculatedFields.upcoming_interview_date).toLocaleDateString()
+                  : 'None scheduled'}
+              </div>
+              <div className="text-sm text-gray-600">Next Interview</div>
+            </div>
+            <div className="text-center p-4 bg-white rounded-lg shadow-sm">
+              <div className="text-sm font-medium text-gray-900">
+                {calculatedFields.primary_interviewer || 'None'}
+              </div>
+              <div className="text-sm text-gray-600">Primary Interviewer</div>
             </div>
           </div>
         </div>
@@ -428,69 +479,90 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900 flex items-center">
               <Calendar className="h-5 w-5 mr-2 text-purple-600" />
-              Interview History
+              Interview History & Schedule
             </h3>
             <button
               type="button"
               onClick={addInterviewToHistory}
-              className="px-3 py-1 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors text-sm flex items-center"
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm flex items-center shadow-md"
               disabled={loading}
             >
-              <Plus className="h-4 w-4 mr-1" />
+              <Plus className="h-4 w-4 mr-2" />
               Add Interview
             </button>
           </div>
           
           {interviewHistory.length === 0 ? (
-            <p className="text-gray-500 text-center py-4 border-2 border-dashed border-gray-300 rounded-lg">
-              No previous interviews recorded
-            </p>
+            <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+              <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <p className="text-gray-500 text-lg font-medium">No interviews scheduled yet</p>
+              <p className="text-gray-400 text-sm mt-1">Add interview rounds to track the candidate's progress</p>
+            </div>
           ) : (
             <div className="space-y-4">
               {interviewHistory.map((interview, index) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-4 relative">
-                  <button
-                    type="button"
-                    onClick={() => removeInterviewFromHistory(index)}
-                    className="absolute top-2 right-2 text-red-600 hover:text-red-800"
-                    disabled={loading}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div key={index} className="border border-gray-200 rounded-lg p-6 relative bg-gray-50">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-2">
+                      <span className="bg-purple-100 text-purple-800 text-sm font-medium px-3 py-1 rounded-full">
+                        Round {interview.round_number || index + 1}
+                      </span>
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                        interview.status === 'Completed' ? 'bg-green-100 text-green-800' :
+                        interview.status === 'Scheduled' ? 'bg-blue-100 text-blue-800' :
+                        interview.status === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {interview.status || 'Scheduled'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeInterviewFromHistory(index)}
+                      className="text-red-600 hover:text-red-800 p-1 rounded-md hover:bg-red-50 transition-colors"
+                      disabled={loading}
+                      title="Remove Interview"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Interview Date
+                        Interview Date *
                       </label>
                       <input
                         type="date"
                         value={interview.interview_date ? new Date(interview.interview_date).toISOString().split('T')[0] : ''}
                         onChange={(e) => updateInterviewHistory(index, 'interview_date', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
                         disabled={loading}
+                        required
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Interviewer
+                        Interviewer *
                       </label>
                       <input
                         type="text"
                         value={interview.interviewer_name || ''}
                         onChange={(e) => updateInterviewHistory(index, 'interviewer_name', e.target.value)}
                         placeholder="Interviewer name"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
                         disabled={loading}
+                        required
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Type
+                        Interview Type
                       </label>
                       <select
                         value={interview.interview_type || 'Phone'}
                         onChange={(e) => updateInterviewHistory(index, 'interview_type', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
                         disabled={loading}
                       >
                         <option value="Phone">Phone</option>
@@ -501,80 +573,66 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
                         <option value="Final">Final</option>
                       </select>
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Status
+                      </label>
+                      <select
+                        value={interview.status || 'Scheduled'}
+                        onChange={(e) => updateInterviewHistory(index, 'status', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                        disabled={loading}
+                      >
+                        <option value="Scheduled">Scheduled</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Cancelled">Cancelled</option>
+                        <option value="Rescheduled">Rescheduled</option>
+                      </select>
+                    </div>
                   </div>
+
+                  {interview.status === 'Completed' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Rating (1-5)
+                        </label>
+                        <select
+                          value={interview.rating || ''}
+                          onChange={(e) => updateInterviewHistory(index, 'rating', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                          disabled={loading}
+                        >
+                          <option value="">Select rating</option>
+                          <option value="1">1 - Poor</option>
+                          <option value="2">2 - Below Average</option>
+                          <option value="3">3 - Average</option>
+                          <option value="4">4 - Good</option>
+                          <option value="5">5 - Excellent</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Feedback
+                        </label>
+                        <textarea
+                          value={interview.feedback || ''}
+                          onChange={(e) => updateInterviewHistory(index, 'feedback', e.target.value)}
+                          placeholder="Interview feedback and notes..."
+                          rows={2}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white resize-none"
+                          disabled={loading}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Next Interview Section */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <Calendar className="h-5 w-5 mr-2 text-orange-600" />
-            Next Interview Details
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Next Interview Date
-              </label>
-              <input
-                type="date"
-                value={nextInterview.interview_date || ''}
-                onChange={(e) => updateNextInterview('interview_date', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Next Interviewer
-              </label>
-              <input
-                type="text"
-                value={nextInterview.interviewer_name || ''}
-                onChange={(e) => updateNextInterview('interviewer_name', e.target.value)}
-                placeholder="Enter next interviewer's name"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                disabled={loading}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Interview Type
-              </label>
-              <select
-                value={nextInterview.interview_type || 'Phone'}
-                onChange={(e) => updateNextInterview('interview_type', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                disabled={loading}
-              >
-                <option value="Phone">Phone</option>
-                <option value="Video">Video</option>
-                <option value="In-person">In-person</option>
-                <option value="Technical">Technical</option>
-                <option value="HR">HR</option>
-                <option value="Final">Final</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Notes
-              </label>
-              <textarea
-                value={nextInterview.notes || ''}
-                onChange={(e) => updateNextInterview('notes', e.target.value)}
-                placeholder="Any additional notes..."
-                rows={3}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors resize-none"
-                disabled={loading}
-              />
-            </div>
-          </div>
-        </div>
-
-         {/* Form Actions */}
+        {/* Form Actions */}
         <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
           <button
             type="button"

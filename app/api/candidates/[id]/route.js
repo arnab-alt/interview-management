@@ -1,3 +1,4 @@
+// app/api/candidates/[id]/route.js - Fixed with await params
 import { NextResponse } from 'next/server';
 import dbConnect from '../../../../lib/mongodb';
 import Candidate from '../../../../models/Candidate';
@@ -6,7 +7,7 @@ export async function GET(request, { params }) {
   await dbConnect();
 
   try {
-    const { id } = params;
+    const { id } = await params; // Add await here
     const candidate = await Candidate.findById(id);
     
     if (!candidate) {
@@ -29,8 +30,16 @@ export async function PUT(request, { params }) {
   await dbConnect();
 
   try {
-    const { id } = params;
+    const { id } = await params; // Add await here
     const body = await request.json();
+    
+    // Process interview history to set proper dates
+    if (body.interview_history && Array.isArray(body.interview_history)) {
+      body.interview_history = body.interview_history.map(interview => ({
+        ...interview,
+        interview_date: interview.interview_date ? new Date(interview.interview_date) : new Date(),
+      }));
+    }
     
     const candidate = await Candidate.findByIdAndUpdate(id, body, {
       new: true,
@@ -66,7 +75,7 @@ export async function DELETE(request, { params }) {
   await dbConnect();
 
   try {
-    const { id } = params;
+    const { id } = await params; // Add await here
     const deletedCandidate = await Candidate.deleteOne({ _id: id });
     
     if (!deletedCandidate.deletedCount) {
