@@ -6,6 +6,16 @@ const InterviewSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
+  interview_time: {
+    type: String,
+    default: '',
+    match: [/^([01]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/, 'Please enter a valid time in HH:MM or HH:MM:SS format'],
+  },
+  interview_timezone: {
+    type: String,
+    enum: ['IST', 'EST', 'CST', 'MST', 'PST'],
+    default: 'IST',
+  },
   interviewer_name: {
     type: String,
     required: true,

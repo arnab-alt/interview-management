@@ -35,7 +35,9 @@ export default function Dashboard() {
   
   const [loading, setLoading] = useState(true);
 
+  const [lastUpdatedTime, setLastUpdatedTime] = useState(null); 
   useEffect(() => {
+    setLastUpdatedTime(new Date().toLocaleTimeString());
     fetchAllStats();
   }, []);
 
@@ -130,7 +132,7 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center space-x-2 text-sm text-gray-500">
           <Activity className="h-4 w-4" />
-          <span>Last updated: {new Date().toLocaleTimeString()}</span>
+          <span>Last updated: {lastUpdatedTime || '...'}</span>
         </div>
       </div>
       

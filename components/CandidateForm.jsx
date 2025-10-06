@@ -5,15 +5,19 @@ import { Save, X, User, Mail, Phone, Calendar, Building, UserCheck, Plus, Trash2
 
 export default function CandidateForm({ candidate = null, onSubmit, onCancel, loading = false }) {
   // Basic info refs
-  const nameRef = useRef();
-  const emailRef = useRef();
-  const phoneRef = useRef();
-  const recruiterRef = useRef();
-  const salesPersonRef = useRef();
-  const companyRef = useRef();
-  const statusRef = useRef();
-  
+  const nameRef = useRef(null);
+  const emailRef = useRef(null);
+  const phoneRef = useRef(null);
+  const recruiterRef = useRef(null);
+  const salesPersonRef = useRef(null);
+  const companyRef = useRef(null);
+  const statusRef = useRef(null);
+  const jobDescriptionRef = useRef(null);
+
   const [errors, setErrors] = useState({});
+  const [jobDescriptionLength, setJobDescriptionLength] = useState(
+    candidate?.job_description?.length || 0
+  );
   const [interviewHistory, setInterviewHistory] = useState(candidate?.interview_history || []);
 
   // Auto-calculate fields from interview history
@@ -114,7 +118,7 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
     const phone = phoneRef.current?.value?.trim();
     const recruiter = recruiterRef.current?.value?.trim();
     const salesPerson = salesPersonRef.current?.value?.trim();
-    const company = companyRef.current?.value?.trim();
+    const company = companyRef.current?.value;
     
     if (!name) {
       newErrors.candidate_name = 'Candidate name is required';
@@ -141,7 +145,7 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
     }
     
     if (!company) {
-      newErrors.interviewed_company_name = 'Company name is required';
+      newErrors.interviewed_company_name = 'Company selection is required';
     }
 
     setErrors(newErrors);
@@ -158,7 +162,8 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
         candidate_phone_no: phoneRef.current?.value?.trim() || '',
         recruiter_name: recruiterRef.current?.value?.trim() || '',
         sales_person_name: salesPersonRef.current?.value?.trim() || '',
-        interviewed_company_name: companyRef.current?.value?.trim() || '',
+        interviewed_company_name: companyRef.current?.value || '',
+        job_description: jobDescriptionRef.current?.value?.trim() || '',
         current_status: statusRef.current?.value || 'Applied',
         
         // Auto-calculated fields from interview history
@@ -504,7 +509,7 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-2">
                       <span className="bg-purple-100 text-purple-800 text-sm font-medium px-3 py-1 rounded-full">
-                        Round {interview.round_number || index + 1}
+                        Interview {interview.round_number || index + 1}
                       </span>
                       <span className={`text-xs font-medium px-2 py-1 rounded-full ${
                         interview.status === 'Completed' ? 'bg-green-100 text-green-800' :
