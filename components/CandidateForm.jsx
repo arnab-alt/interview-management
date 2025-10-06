@@ -549,7 +549,7 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
                         </span>
                       )}
                     </div>
-                    <button
+                    {/* <button
                       type="button"
                       onClick={() => removeInterviewFromHistory(index)}
                       className="text-red-600 hover:text-red-800 p-1 rounded-md hover:bg-red-50 transition-colors"
@@ -557,7 +557,7 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
                       title="Remove Interview"
                     >
                       <Trash2 className="h-4 w-4" />
-                    </button>
+                    </button> */}
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-4">
