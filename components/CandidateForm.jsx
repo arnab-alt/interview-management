@@ -509,7 +509,7 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-2">
                       <span className="bg-purple-100 text-purple-800 text-sm font-medium px-3 py-1 rounded-full">
-                        Interview {interview.round_number || index + 1}
+                        Round {interview.round_number || index + 1}
                       </span>
                       <span className={`text-xs font-medium px-2 py-1 rounded-full ${
                         interview.status === 'Completed' ? 'bg-green-100 text-green-800' :
