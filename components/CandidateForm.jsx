@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect } from 'react';
-import { Save, X, User, Mail, Phone, Calendar, Building, UserCheck, Plus, Trash2 } from 'lucide-react';
+import { Save, X, User, Mail, Phone, Calendar, Building, UserCheck, Plus, Trash2, Clock } from 'lucide-react';
 
 export default function CandidateForm({ candidate = null, onSubmit, onCancel, loading = false }) {
   // Basic info refs
@@ -84,6 +84,8 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
   const addInterviewToHistory = () => {
     const newInterview = {
       interview_date: '',
+      interview_time: '',
+      interview_timezone: 'IST',
       interviewer_name: '',
       interview_type: 'Phone',
       status: 'Scheduled',
@@ -186,6 +188,19 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
       
       onSubmit(formData);
     }
+  };
+
+  const formatDateTime = (date, time, timezone) => {
+    if (!date) return 'Not scheduled';
+    const dateStr = new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+    if (time) {
+      return `${dateStr} at ${time} ${timezone}`;
+    }
+    return dateStr;
   };
 
   return (
@@ -456,7 +471,11 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
             <div className="text-center p-4 bg-white rounded-lg shadow-sm">
               <div className="text-sm font-medium text-gray-900">
                 {calculatedFields.last_date_of_interview 
-                  ? new Date(calculatedFields.last_date_of_interview).toLocaleDateString()
+                  ? new Date(calculatedFields.last_date_of_interview).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    })
                   : 'None'}
               </div>
               <div className="text-sm text-gray-600">Last Interview</div>
@@ -464,7 +483,11 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
             <div className="text-center p-4 bg-white rounded-lg shadow-sm">
               <div className="text-sm font-medium text-gray-900">
                 {calculatedFields.upcoming_interview_date 
-                  ? new Date(calculatedFields.upcoming_interview_date).toLocaleDateString()
+                  ? new Date(calculatedFields.upcoming_interview_date).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    })
                   : 'None scheduled'}
               </div>
               <div className="text-sm text-gray-600">Next Interview</div>
@@ -519,6 +542,12 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
                       }`}>
                         {interview.status || 'Scheduled'}
                       </span>
+                      {interview.interview_time && (
+                        <span className="text-xs text-gray-600 flex items-center">
+                          <Clock className="h-3 w-3 mr-1" />
+                          {interview.interview_time} {interview.interview_timezone}
+                        </span>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -531,7 +560,7 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
                     </button>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Interview Date *
@@ -544,6 +573,37 @@ export default function CandidateForm({ candidate = null, onSubmit, onCancel, lo
                         disabled={loading}
                         required
                       />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Time (24hr)
+                      </label>
+                      <input
+                        type="time"
+                        value={interview.interview_time || ''}
+                        onChange={(e) => updateInterviewHistory(index, 'interview_time', e.target.value)}
+                        step="1"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                        disabled={loading}
+                        placeholder="HH:MM:SS"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Timezone
+                      </label>
+                      <select
+                        value={interview.interview_timezone || 'IST'}
+                        onChange={(e) => updateInterviewHistory(index, 'interview_timezone', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                        disabled={loading}
+                      >
+                        <option value="IST">IST</option>
+                        <option value="EST">EST</option>
+                        <option value="CST">CST</option>
+                        <option value="MST">MST</option>
+                        <option value="PST">PST</option>
+                      </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
